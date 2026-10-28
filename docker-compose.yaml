@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports: 
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  service:
+    build: ./service
+    environment:
+      # Передача строки подключения, которую ожидает SQLAlchemy в коде приложения.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on: 
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+
+  gateway: 
+    build: ./gateway
+    environment:
+      SERVICE_URL: http://service:8001
+    depends_on:
+      - service
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
