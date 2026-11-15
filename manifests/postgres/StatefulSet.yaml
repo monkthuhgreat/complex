@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+# Тип ресурса: используется для баз данных, гарантирует постоянные имена подов и привязку дисков
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: fago
+spec:
+  serviceName: "postgres-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:18-alpine
+        ports:
+        - containerPort: 5432
+        # Массовая загрузка переменных окружения из внешних объектов
+        envFrom:
+        # Загрузить все ключи из объекта Secret
+        - secretRef:
+            # Имя секрета 
+            name: fago-env
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          exec:
+            # Стандартная утилита Postgres проверяет доступность БД и пользователя из переменных
+            command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          exec:
+            command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        # Подключение постоянных дисков внутрь файловой системы контейнера
+        volumeMounts:
+        - name: pgdata
+          # Путь внутри контейнера, куда смонтируется диск
+          mountPath: /var/lib/postgresql
+  # Шаблон для автоматического создания персонального диска (PVC) для каждого пода
+  volumeClaimTemplates:
+  - metadata:
+      name: pgdata
+    spec:
+      # Режим доступа: диск может быть подключен на чтение и запись только к одному узлу (поду)
+      accessModes: [ "ReadWriteOnce" ]
+      # Класс хранилища (local-path создает папку прямо на диске локального узла)
+      storageClassName: "local-path"
+      # Запрашиваемый объем дискового пространства
+      resources:
+        requests:
+          storage: 10Gi

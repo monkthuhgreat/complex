@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: fago-service
+  name: service-deployment
+  namespace: fago
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fago-service
+  template:
+    metadata:
+      labels:
+        app: fago-service
+    spec:
+      # Контейнеры инициализации: запускаются и завершаются ДО основного контейнера
+      initContainers:
+        # Имя init-контейнера для ожидания готовности базы данных
+        - name: wait-for-postgres
+          image: postgres:18-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres-service -p 5432; do echo "Waiting for postgres..."; sleep 2; done
+      containers:
+        - name: fago-service
+          image: local/fago-service:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - secretRef:
+                name: fago-env
+          env:
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres-service:5432/$(POSTGRES_DB)"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 10

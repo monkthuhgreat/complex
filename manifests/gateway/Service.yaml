@@ -1,0 +1,27 @@
+# Базовая версия API Kubernetes (для Service всегда используется v1)
+apiVersion: v1
+# Тип ресурса: сетевой балансировщик, дающий постоянный IP и DNS подам
+kind: Service
+metadata:
+  labels:
+    app: fago-gateway
+  # Имя сервиса (станет внутренним DNS-именем: gateway-service.fago)  
+  name: gateway-service
+  namespace: fago
+spec:
+  # Тип сервиса: доступен только внутри кластера (по умолчанию)
+  type: ClusterIP
+  # Правило поиска подов, на которые будет направляться трафик
+  selector:
+    # Должно совпадать с labels в секции template Deployment
+    app: fago-gateway
+  # Список портов, которые обслуживает этот сервис  
+  ports:
+    # Имя порта 
+    - name: http
+      # Сетевой протокол передачи данных 
+      protocol: TCP
+      # Внешний порт самого Service, по которому к нему обращаются внутри кластера
+      port: 8080
+      # Целевой порт внутри контейнера пода (совпадает с containerPort: 8080)
+      targetPort: 8080

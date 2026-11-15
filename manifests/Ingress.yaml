@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+# Тип ресурса: управляет внешним HTTP/HTTPS-доступом к сервисам внутри кластера
+kind: Ingress
+metadata:
+  name: fago-ingress
+  namespace: fago
+spec:
+  rules:
+    # Правило для HTTP-трафика
+    - http:
+        # Список путей URL, по которым распределяется трафик
+        paths:
+          # Корневой путь сайта 
+          - path: /
+            # Тип совпадения пути: Prefix означает совпадение по префиксу URL 
+            pathType: Prefix
+            # Целевой сервис внутри кластера, куда будет перенаправлен запрос
+            backend:
+              service:
+                # Имя объекта Service
+                name: gateway-service
+                port:
+                  number: 8080
